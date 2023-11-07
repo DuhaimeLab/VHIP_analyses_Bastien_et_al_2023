@@ -1,0 +1,747 @@
+---
+title: "R Notebook"
+author: "Eric Bastien"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Introduction
+
+In this file I will explore the results of different models prediction on the Nahant Collection and the Staph Study. The results of those tools on those datasets was stitched and orignally analyzed in the ExistingModelsAccuracy.ipynb, but I decided to finish the plotting in R instead.
+
+# Setup
+
+Load libraries and set knitting options.
+```{r libraries}
+# general libraries
+library(tidyverse)
+library(here)
+
+# plotting
+library(ggthemes)
+library(RColorBrewer)
+
+# set knitting options
+knitr::opts_chunk$set(dev=c('png'), fig.path='../reports/figures/ExistingModelsAccuracyResults_', fig.width=8, fig.height=8)
+
+# check here::here
+here::here()
+```
+
+Custom theme for plotting
+```{r ggplot_theme}
+# Theme Publication for ggplot
+theme_Publication <- function(base_size=14) { # can add base_family = "Helvetica"
+  (theme_foundation(base_size = base_size)
+    + theme(plot.title = element_text(face = "bold", size = rel(1.2), hjust = 0.5),
+            text = element_text(),
+            panel.background = element_rect(colour = NA),
+            plot.background = element_rect(colour = NA),
+            panel.border = element_rect(colour = NA),
+            axis.title = element_text(face = "bold",size = rel(1)),
+            axis.title.y = element_text(angle = 90,vjust = 2),
+            axis.title.x = element_text(vjust = -0.2),
+            axis.text = element_text(),
+            axis.line = element_line(colour = "black"),
+            axis.ticks = element_line(),
+            panel.grid.major = element_line(colour = "#f0f0f0"),
+            panel.grid.minor = element_blank(),
+            legend.key = element_rect(colour = NA),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.key.size = unit(0.2, "cm"),
+            legend.spacing = unit(0, "cm"),
+            legend.title = element_text(face = "italic"),
+            plot.margin = unit(c(10,5,5,5),"mm"),
+            strip.background = element_rect(colour = "#f0f0f0", fill = "#f0f0f0"),
+            strip.text = element_text(face = "bold")
+  ))
+}
+
+# Set theme for all plots in this document
+theme_set(theme_Publication())
+
+```
+
+Load the data
+```{r}
+results <- read_tsv(here('./data/output/modelsaccuracy_results.tsv')) %>%
+  # add species to RaFAH (missing because tool does not predict at the species level) - this is purely needed for plotting purposes
+  add_row(Tool='RAFAH', Dataset='StaphStudy', Taxa_lvl='Species', Correct=0, Wrong=0, Unknown=0, perc_accuracy=0, perc_unknown=0) %>%
+  add_row(Tool='RAFAH', Dataset='NahantCollection', Taxa_lvl='Species', Correct=0, Wrong=0, Unknown=0, perc_accuracy=0, perc_unknown=0) %>%
+  # different calculations of accuracies
+  mutate(perc_accuracy_wrong = Wrong / (Correct + Wrong)) %>%
+  mutate(perc_accuracy_right = Correct / (Correct + Wrong)) %>%
+  mutate(perc_wrong = Wrong / (Correct + Wrong + Unknown)) %>%
+  # fix naming system (purely for plotting aesthetics)
+  mutate(Dataset=replace(Dataset, Dataset=='StaphStudy', 'Staphylococcus Study')) %>%
+  mutate(Dataset=replace(Dataset, Dataset=='NahantCollection', 'Nahant Collection'))
+
+results
+```
+
+# Analysis and plotting!
+
+Plotting accuracy!
+Defined as: Correct / (Correct + Wrong)
+
+```{r VHPtools_accuracy_bytool_colorbytaxa_wrapbystudy, fig.height=6, fig.width=15, warning=FALSE}
+taxa_order <- c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum')
+
+ggplot(results, aes(x = Tool, y = perc_accuracy_right, fill = factor(Taxa_lvl, taxa_order))) +
+  geom_bar(stat='identity', position='dodge', color='black') +
+  facet_wrap(~Dataset) + 
+  scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) + 
+  scale_x_discrete(labels = c('CHERRY', 'iPHoP', 'iPHoP\nBest Prediction', 'RAFAH', 'VHMnet', 'vHULK')) +
+  scale_fill_manual(values=c('Species'='#436C51', 'Genus'='#109648', 'Family'='#d69731', 'Order'='#FFCB77', 'Class'='#97DFFC', 'Phylum'='#2B59C3')) +
+  theme(
+    legend.key.size = unit(0.7, 'cm'),
+    legend.text = element_text(size=13),
+    legend.title = element_blank(),
+    panel.spacing = unit(3, 'lines'), 
+    strip.text.x = element_text(size=18),
+    strip.background = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size=14, face='bold'),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size=18)
+  ) + 
+  guides(fill=guide_legend(nrow=1)) +
+  labs(
+    fill = "Taxonomic Level", 
+    y = "Accuracy (%)"
+  )
+```
+
+```{r VHPtools_accuracy_bytool_colorbytaxa_wrapbystudy_notnormalized, fig.height=6, fig.width=15, warning=FALSE}
+taxa_order <- c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum')
+
+ggplot(results, aes(x = Tool, y = Correct, fill = factor(Taxa_lvl, taxa_order))) +
+  geom_bar(stat='identity', position='dodge', color='black') +
+  facet_wrap(~Dataset) + 
+  #scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) + 
+  scale_x_discrete(labels = c('CHERRY', 'iPHoP', 'iPHoP\nBest Prediction', 'RAFAH', 'VHMnet', 'vHULK')) +
+  scale_fill_manual(values=c('Species'='#436C51', 'Genus'='#109648', 'Family'='#d69731', 'Order'='#FFCB77', 'Class'='#97DFFC', 'Phylum'='#2B59C3')) +
+  theme(
+    legend.key.size = unit(0.7, 'cm'),
+    legend.text = element_text(size=13),
+    legend.title = element_blank(),
+    panel.spacing = unit(3, 'lines'), 
+    strip.text.x = element_text(size=18),
+    strip.background = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size=14, face='bold'),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size=18)
+  ) + 
+  guides(fill=guide_legend(nrow=1)) +
+  labs(
+    fill = "Taxonomic Level", 
+    y = "Correct"
+  ) 
+```
+
+
+Plotting inaccuracies. 
+Defined as: Wrong / (Correct + Wrong)
+
+```{r VHPtools_inaccuracy_bytool_colorbytaxa_wrapbystudy, fig.height=6, fig.width=15, warning=FALSE}
+taxa_order <- c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum')
+
+ggplot(results, aes(x = Tool, y = perc_accuracy_wrong, fill = factor(Taxa_lvl, taxa_order))) +
+  geom_bar(stat='identity', position='dodge', color='black') +
+  facet_wrap(~Dataset) + 
+  scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) + 
+  scale_x_discrete(labels = c('CHERRY', 'iPHoP', 'iPHoP\nBest Prediction', 'RAFAH', 'VHMnet', 'vHULK')) +
+
+  scale_fill_manual(values=c('Species'='#436C51', 'Genus'='#109648', 'Family'='#d69731', 'Order'='#FFCB77', 'Class'='#97DFFC', 'Phylum'='#2B59C3')) +
+  theme(
+    legend.key.size = unit(0.7, 'cm'),
+    legend.text = element_text(size=13),
+    legend.title = element_blank(),
+    panel.spacing = unit(3, 'lines'), 
+    strip.text.x = element_text(size=18),
+    strip.background = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size=14, face='bold'),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size=18)
+  ) + 
+  guides(fill=guide_legend(nrow=1)) +
+  labs(
+    fill = "Taxonomic Level", 
+    y = "Inaccuracy (%)"
+  )
+```
+
+Plotting unknown predictions. 
+Defined as: Unknown / (Correct + Wrong + Unknown)
+
+```{r VHPtools_unknown_bytool_colorbytaxa_wrapbystudy, fig.height=6, fig.width=15}
+taxa_order <- c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum')
+
+ggplot(results, aes(x = Tool, y = perc_unknown, fill = factor(Taxa_lvl, taxa_order))) +
+  geom_bar(stat='identity', position='dodge', color='black') +
+  facet_wrap(~Dataset) +
+  scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) + 
+  scale_x_discrete(labels = c('CHERRY', 'iPHoP', 'iPHoP\nBest Prediction', 'RAFAH', 'VHMnet', 'vHULK')) +
+
+  scale_fill_manual(values=c('Species'='#436C51', 'Genus'='#109648', 'Family'='#d69731', 'Order'='#FFCB77', 'Class'='#97DFFC', 'Phylum'='#2B59C3')) +
+  theme(
+    legend.key.size = unit(0.7, 'cm'),
+    legend.text = element_text(size=13),
+    legend.title = element_blank(),
+    panel.spacing = unit(3, 'lines'), 
+    strip.text.x = element_text(size=18),
+    strip.background = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size=14, face='bold'),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size=18)
+  ) + 
+  guides(fill=guide_legend(nrow=1)) +
+  labs(
+    fill = "Taxonomic Level", 
+    y = "Unknown (%)"
+  )
+
+```
+
+Accuracy version where unknown is included. 
+Accuracy is this case is calculated this way: Correct / (Correct + Wrong + Unknown)
+
+This is stretching a bit but shows the impact of unknown on the accuracy. 
+
+```{r VHPtools_stretchedaccuracy_bytool_colorbytaxa_wrapbystudy, fig.height=6, fig.width=15}
+taxa_order <- c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum')
+
+ggplot(results, aes(x = Tool, y = perc_accuracy, fill = factor(Taxa_lvl, taxa_order))) +
+  geom_bar(stat='identity', position='dodge', color='black') +
+  facet_wrap(~Dataset) +
+  scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) + 
+  scale_x_discrete(labels = c('CHERRY', 'iPHoP', 'iPHoP\nBest Prediction', 'RAFAH', 'VHMnet', 'vHULK')) +
+
+  scale_fill_manual(values=c('Species'='#436C51', 'Genus'='#109648', 'Family'='#d69731', 'Order'='#FFCB77', 'Class'='#97DFFC', 'Phylum'='#2B59C3')) +
+  theme(
+    legend.key.size = unit(0.7, 'cm'),
+    legend.text = element_text(size=13),
+    legend.title = element_blank(),
+    panel.spacing = unit(3, 'lines'), 
+    strip.text.x = element_text(size=18),
+    strip.background = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size=14, face='bold'),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size=18)
+  ) + 
+  guides(fill=guide_legend(nrow=1)) +
+  labs(
+    fill = "Taxonomic Level", 
+    y = "Accuracy (including Unknown)"
+  )
+
+```
+
+Let's do a version where I focus on the taxa on the x-axis, and color by the tool. 
+
+```{r VHPtools_stretchedaccuracy_bytaxa_colorbytool_wrapbystudy, fig.height=6, fig.width=15}
+tool_order <- c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'VHMnet', 'vHULK', 'RAFAH')
+
+ggplot(results, aes(x = factor(Taxa_lvl, taxa_order), y = perc_accuracy, fill = factor(Tool, tool_order))) +
+  geom_bar(stat='identity', position='dodge', color='black') +
+  facet_wrap(~factor(Dataset, levels=c('Staphylococcus Study', 'Nahant Collection'))) +
+  scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+  scale_fill_manual(values=c('iPHoP_bestpred'='#436C51', 'iPHoP'='#109648', 'CHERRY'='#d69731', 'RAFAH'='#FFCB77', 'VHMnet'='#97DFFC', 'vHULK'='#2B59C3')) +
+  theme(
+    legend.key.size = unit(0.7, 'cm'),
+    legend.text = element_text(size=13),
+    legend.title = element_blank(),
+    panel.spacing = unit(3, 'lines'), 
+    strip.text.x = element_text(size=18),
+    strip.background = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size=14, face='bold'),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size=18)
+  ) + 
+  guides(fill=guide_legend(nrow=1)) +
+  labs(
+    fill = "Prediction Tool", 
+    y = "Accuracy (including Unknown)"
+  )
+```
+
+```{r VHPtools_focusedontaxa_facetgrid_fixednames_VEGA2022, fig.height=9, fig.width=15}
+
+results %>% 
+  select(-Unknown) %>%
+  rename('Accuracy' = perc_accuracy, 'Untested' = perc_unknown) %>%
+  pivot_longer(c(Accuracy, Untested)) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+  ggplot(aes(x=factor(Taxa_lvl, taxa_order), y=value, fill=factor(Tool, tool_order))) +
+    geom_bar(stat='identity', position='dodge', color='black') + 
+    geom_hline(yintercept=0, size=1) + # this is purely for aeshetic purposes
+    #facet_grid(name~fct_relevel(Dataset, levels=c('Göller et al. (Staphylococcus)', 'Kauffman et al. (Marine Vibrios)')), switch='y') +
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('iPHoP_bestpred'='#436C51', 'iPHoP'='#109648', 'CHERRY'='#d69731', 'RAFAH'='#FFCB77', 'VHMnet'='#97DFFC', 'vHULK'='#2B59C3')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      axis.title.x = element_blank(),
+      axis.text.x = element_text(size=14, face='bold'),
+      axis.text.y = element_text(size = 12),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank()
+    ) + 
+    guides(fill=guide_legend(nrow=1)) +
+    labs(
+      fill = "Prediction Tool"
+  )
+
+
+
+```
+
+
+```{r VHPtools_focusedontaxa_facetgrid, fig.height=9, fig.width=15}
+results %>% 
+  select(-Unknown) %>%
+  rename('Accuracy' = perc_accuracy, 'Unknown' = perc_unknown) %>%
+  pivot_longer(c(Accuracy, Unknown)) %>%
+  ggplot(aes(x=factor(Tool, tool_order), y=value, fill=factor(Taxa_lvl, taxa_order))) +
+    geom_bar(stat='identity', position='dodge', color='black') + 
+    geom_hline(yintercept=0, size=1) + # this is purely for aeshetic purposes
+    facet_grid(name~Dataset, switch='y') +
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_x_discrete(labels = c('CHERRY', 'iPHoP', 'iPHoP\nBest Prediction', 'RAFAH', 'VHMnet', 'vHULK')) +
+    scale_fill_manual(values=c('Species'='#436C51', 'Genus'='#109648', 'Family'='#d69731', 'Order'='#FFCB77', 'Class'='#97DFFC', 'Phylum'='#2B59C3')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      axis.title.x = element_blank(),
+      axis.text.x = element_text(size=14, face='bold'),
+      axis.text.y = element_text(size = 12),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank()
+    ) + 
+    guides(fill=guide_legend(nrow=1)) +
+    labs(
+      fill = "Prediction Tool"
+  )
+```
+
+
+
+# Suggestions from Luis Zaman
+
+Bar plot where it's a fraction. This would emphasize better the results between correct, wrong, and untested (those would be colored). There will be as many bars as number of tools, but can only plot one taxa level at a time. 
+This will get busy really quick, but thinking about making a two panels figure with the above plot(s). 
+
+```{r VHPtools_stacked_species, fig.height=6, fig.width=12}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # filter taxa and study
+  filter(Taxa_lvl == 'Species') %>%
+  #filter(Dataset == 'Nahant Collection') %>%
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+  
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_wrap(~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP\nbest prediction', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(), 
+      axis.title = element_text(size=18), 
+      axis.text.y = element_text(size=15),
+      axis.text.x = element_text(size=14),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      title = element_text(size=18)
+
+    ) +
+    labs(
+      y = 'Fraction', 
+      title = 'Species Taxonomic Level'
+    )
+  
+```
+
+
+```{r VHPtools_stacked_genus, fig.height=6, fig.width=12}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # filter taxa and study
+  filter(Taxa_lvl == 'Genus') %>%
+  #filter(Dataset == 'Nahant Collection') %>%
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_wrap(~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP\nbest prediction', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(), 
+      axis.title = element_text(size=18), 
+      axis.text.y = element_text(size=15),
+      axis.text.x = element_text(size=14),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      title = element_text(size=18)
+
+    ) +
+    labs(
+      y = 'Fraction', 
+      title = 'Genus Taxonomic Level'
+    )
+  
+```
+
+
+
+```{r VHPtools_stacked_family, fig.height=6, fig.width=12}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # filter taxa and study
+  filter(Taxa_lvl == 'Family') %>%
+  #filter(Dataset == 'Nahant Collection') %>%
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_wrap(~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP\nbest prediction', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(), 
+      axis.title = element_text(size=18), 
+      axis.text.y = element_text(size=15),
+      axis.text.x = element_text(size=14),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      title = element_text(size=18)
+
+    ) +
+    labs(
+      y = 'Fraction', 
+      title = 'Family Taxonomic Level'
+    )
+  
+```
+
+
+
+```{r VHPtools_stacked_order, fig.height=6, fig.width=12}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # filter taxa and study
+  filter(Taxa_lvl == 'Order') %>%
+  #filter(Dataset == 'Nahant Collection') %>%
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_wrap(~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP\nbest prediction', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(), 
+      axis.title = element_text(size=18), 
+      axis.text.y = element_text(size=15),
+      axis.text.x = element_text(size=14),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      title = element_text(size=18)
+
+    ) +
+    labs(
+      y = 'Fraction', 
+      title = 'Order Taxonomic Level'
+    )
+  
+```
+
+
+
+
+```{r VHPtools_stacked_class, fig.height=6, fig.width=12}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # filter taxa and study
+  filter(Taxa_lvl == 'Class') %>%
+  #filter(Dataset == 'Nahant Collection') %>%
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_wrap(~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP\nbest prediction', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(), 
+      axis.title = element_text(size=18), 
+      axis.text.y = element_text(size=15),
+      axis.text.x = element_text(size=14),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      title = element_text(size=18)
+
+    ) +
+    labs(
+      y = 'Fraction', 
+      title = 'Class Taxonomic Level'
+    )
+  
+```
+
+
+```{r VHPtools_stacked_phylum, fig.height=6, fig.width=12}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # filter taxa and study
+  filter(Taxa_lvl == 'Phylum') %>%
+  #filter(Dataset == 'Nahant Collection') %>%
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al. (Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al. (Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_wrap(~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP\nbest prediction', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=13),
+      legend.title = element_blank(), 
+      axis.title = element_text(size=18), 
+      axis.text.y = element_text(size=15),
+      axis.text.x = element_text(size=14),
+      panel.spacing = unit(3, 'lines'), 
+      strip.text = element_text(size=18),
+      strip.background = element_blank(),
+      strip.placement = 'outside', 
+      title = element_text(size=18)
+
+    ) +
+    labs(
+      y = 'Fraction', 
+      title = 'Phylum Taxonomic Level'
+    )
+  
+```
+
+
+
+Grid version of above plots (looking both at either study + taxa level)
+
+```{r VHPtools_stacked_grid, fig.height=9, fig.width=6}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Wrong')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al.\n(Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al.\n(Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Wrong', 'Untested'))) %>%
+  mutate(Taxa_lvl = fct_relevel(Taxa_lvl, c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_grid(Taxa_lvl~Dataset) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03), breaks=c(0, 0.5, 1)) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Wrong'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP bp', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=12),
+      legend.title = element_blank(), 
+      axis.text.y = element_text(size=13),
+      axis.text.x = element_text(angle=45, vjust=1, hjust =1, size=14),
+      panel.spacing = unit(1, 'lines'), 
+      strip.text = element_text(size=16),
+      strip.background = element_blank(),
+      strip.placement = 'outside'
+    ) +
+    labs(
+      y = 'Fraction'
+    )
+  
+```
+
+
+
+Let's try the other orientation. 
+
+```{r VHPtools_stacked_grid_2ndorientation, fig.height=6, fig.width=13}
+results %>%
+  # pivot longer for stacked bar plot
+  select(-perc_accuracy_wrong, -perc_accuracy_right) %>%
+  pivot_longer(cols = starts_with('perc')) %>% 
+  # renaming variables for plots
+  mutate(name = replace(name, name == 'perc_accuracy', 'Correct')) %>%
+  mutate(name = replace(name, name == 'perc_unknown', 'Untested')) %>%
+  mutate(name = replace(name, name == 'perc_wrong', 'Incorrect')) %>%  
+  
+  mutate(Dataset = replace(Dataset, Dataset == 'Staphylococcus Study', 'Göller et al.\n(Staphylococcus)')) %>%
+  mutate(Dataset = replace(Dataset, Dataset == 'Nahant Collection', 'Kauffman et al.\n(Marine Vibrios)')) %>%
+
+  # refactoring for order of stack in plots
+  mutate(name = fct_relevel(name, c('Correct', 'Incorrect', 'Untested'))) %>%
+  mutate(Taxa_lvl = fct_relevel(Taxa_lvl, c('Species', 'Genus', 'Family', 'Order', 'Class', 'Phylum'))) %>%
+  
+  # plot
+  ggplot(aes(x = Tool, y = value, fill=name)) +
+    geom_bar(position = 'fill', stat = 'identity', color='black') +
+    facet_grid(Dataset~Taxa_lvl) + 
+    scale_y_continuous(expand=c(0,0), limits=c(0, 1.03), breaks=c(0, 0.5, 1), labels=scales::percent) +
+    scale_fill_manual(values=c('Correct' = '#586BA4', 'Incorrect'= '#F68E5F', 'Untested'='#65655E')) +
+    scale_x_discrete(limits = c('iPHoP_bestpred', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK'), 
+                     labels = c('iPHoP bp', 'iPHoP', 'CHERRY', 'RAFAH', 'VHMnet', 'vHULK')) +
+    theme(
+      legend.key.size = unit(0.7, 'cm'),
+      legend.text = element_text(size=12),
+      legend.title = element_blank(), 
+      axis.text.y = element_text(size=13),
+      axis.text.x = element_text(angle=45, vjust=1, hjust =1, size=14),
+      panel.spacing.x = unit(0.4, 'lines'), 
+      panel.spacing.y = unit(1.5, 'lines'),
+      strip.text = element_text(size=13),
+      strip.background = element_blank(),
+      strip.placement = 'outside'
+    ) +
+    labs(
+      y = 'Percentage of predicted outcomes'
+    )
+  
+```
+
+
+
+
+
+
+
